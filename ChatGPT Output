@@ -4,52 +4,24 @@ class SearchViewController: UIViewController {
     
     @IBOutlet weak var searchBar: UISearchBar!
     @IBOutlet weak var locationTextField: UITextField!
+    @IBOutlet weak var tableView: UITableView!
+    
+    var searchResults: [SearchResult] = []
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
         searchBar.delegate = self
+        tableView.dataSource = self
     }
     
-}
-
-extension SearchViewController: UISearchBarDelegate {
-    
-    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
-        let url = URL(string: "https://api.yelp.com/v3/autocomplete")
-        var urlRequest = URLRequest(url: url!)
-        urlRequest.addValue("Bearer <your_yelp_api_key>", forHTTPHeaderField: "Authorization")
-        urlRequest.httpMethod = "GET"
-        
-        let parameters = ["text": searchText, "latitude": "37.786882", "longitude": "-122.399972"]
-        let encodedParams = parameters.map { (key, value) in
-            return "\(key)=\(value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)"
-        }.joined(separator: "&")
-        urlRequest.url = URL(string: "\(url!.absoluteString)?\(encodedParams)")
-        
-        let task = URLSession.shared.dataTask(with: urlRequest) { (data, response, error) in
-            if let error = error {
-                print("Error: \(error.localizedDescription)")
-                return
-            }
-            
-            guard let data = data else {
-                print("No data received")
-                return
-            }
-            
-            do {
-                let jsonResponse = try JSONSerialization.jsonObject(with: data, options: [])
-                print(jsonResponse)
-                // Parse the response and display suggested search terms to the user
-            } catch {
-                print("Error decoding response: \(error.localizedDescription)")
-            }
-        }
-        task.resume()
+    @IBAction func searchButtonTapped(_ sender: Any) {
+        searchYelp()
+        searchFoursquare()
+        searchGoogleMaps()
     }
     
-    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+    func searchYelp() {
         guard let searchTerm = searchBar.text?.trimmingCharacters(in: .whitespacesAndNewlines), !searchTerm.isEmpty else {
             // Show an error message to the user
             return
@@ -71,9 +43,44 @@ extension SearchViewController: UISearchBarDelegate {
         }.joined(separator: "&")
         yelpURLRequest.url = URL(string: "\(yelpURL.absoluteString)?\(encodedYelpParams)")
         
+        let task = URLSession.shared.dataTask(with: yelpURLRequest) { (data, response, error) in
+            if let error = error {
+                print("Error: \(error.localizedDescription)")
+                return
+            }
+            
+            guard let data = data else {
+                print("No data received")
+                return
+            }
+            
+            do {
+                let decoder = JSONDecoder()
+                decoder.keyDecodingStrategy = .convertFromSnakeCase
+                let yelpResponse = try decoder.decode(YelpResponse.self, from: data)
+                let searchResult = SearchResult(name: yelpResponse.businesses[0].name, yelpRating: yelpResponse.businesses[0].rating)
+                self.searchResults.append(searchResult)
+                self.tableView.reloadData()
+            } catch {
+                print("Error decoding response: \(error.localizedDescription)")
+            }
+        }
+        task.resume()
+    }
+    
+    func searchFoursquare() {
+        guard let searchTerm = searchBar.text?.trimmingCharacters(in: .whitespacesAndNewlines), !searchTerm.isEmpty else {
+            // Show an error message to the user
+            return
+        }
+        
+        guard let location = locationTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines), !location.isEmpty else {
+            // Show an error message to the user
+            return
+        }
+        
         let foursquareURL = URL(string: "https://api.foursquare.com/v2/venues/search")!
         var foursquareURLRequest = URLRequest(url: foursquareURL)
         let foursquareParameters = ["query": searchTerm, "near": location, "client_id": "<your_foursquare_client_id>", "client_secret": "<your_foursquare_client_secret>", "v": "20230505"]
         let encodedFoursquareParams = foursquareParameters.map { (key, value) in
-            return "\(key)=\(value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)"
-        }.joined(separator: "&")
+            return "\(key)=\(value.addingPercentEncoding(withAllowedCharacters:
