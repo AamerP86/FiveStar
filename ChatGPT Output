@@ -86,3 +86,49 @@ class ViewController: UIViewController, UITableViewDataSource, UITableViewDelega
 
             do {
                 let json = try JSONSerialization
+func fetchRatingFromAPI(apiURL: String, completion: @escaping (Double) -> Void) {
+    guard let url = URL(string: apiURL) else { return }
+
+    var request = URLRequest(url: url)
+    request.addValue("Bearer \(yelpAPIKey)", forHTTPHeaderField: "Authorization")
+
+    let task = URLSession.shared.dataTask(with: request) { (data, response, error) in
+        guard let data = data else { return }
+
+        do {
+            let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any]
+            let rating = extractRatingFromAPIResponse(json: json)
+            completion(rating)
+        } catch {
+            print("Error parsing JSON: \(error.localizedDescription)")
+            completion(0.0)
+        }
+    }
+
+    task.resume()
+}
+
+func extractRatingFromAPIResponse(json: [String: Any]?) -> Double {
+    guard let json = json else { return 0.0 }
+
+    if let yelpBusinesses = json["businesses"] as? [[String: Any]],
+       let yelpBusiness = yelpBusinesses.first,
+       let yelpRating = yelpBusiness["rating"] as? Double {
+        return yelpRating
+    }
+
+    if let foursquareVenues = json["response"] as? [String: Any],
+       let foursquareGroups = foursquareVenues["venues"] as? [[String: Any]],
+       let foursquareGroup = foursquareGroups.first,
+       let foursquareRating = foursquareGroup["rating"] as? Double {
+        return foursquareRating
+    }
+
+    if let googleMapsResults = json["results"] as? [[String: Any]],
+       let googleMapsResult = googleMapsResults.first,
+       let googleMapsRating = googleMapsResult["rating"] as? Double {
+        return googleMapsRating
+    }
+
+    return 0.0
+}
