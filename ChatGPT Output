@@ -1,86 +1,88 @@
 import UIKit
 
-class SearchViewController: UIViewController {
-    
-    @IBOutlet weak var searchBar: UISearchBar!
-    @IBOutlet weak var locationTextField: UITextField!
+class ViewController: UIViewController, UITableViewDataSource, UITableViewDelegate, UISearchBarDelegate {
+
     @IBOutlet weak var tableView: UITableView!
-    
-    var searchResults: [SearchResult] = []
-    
+    @IBOutlet weak var searchBar: UISearchBar!
+
+    var restaurants = [Restaurant]()
+
     override func viewDidLoad() {
         super.viewDidLoad()
-        
-        searchBar.delegate = self
+
         tableView.dataSource = self
+        tableView.delegate = self
+        searchBar.delegate = self
     }
-    
-    @IBAction func searchButtonTapped(_ sender: Any) {
-        searchYelp()
-        searchFoursquare()
-        searchGoogleMaps()
+
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        return restaurants.count
     }
-    
-    func searchYelp() {
-        guard let searchTerm = searchBar.text?.trimmingCharacters(in: .whitespacesAndNewlines), !searchTerm.isEmpty else {
-            // Show an error message to the user
-            return
+
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCell(withIdentifier: "restaurantCell", for: indexPath) as! RestaurantTableViewCell
+
+        let restaurant = restaurants[indexPath.row]
+        cell.nameLabel.text = restaurant.name
+        cell.yelpRatingLabel.text = "Yelp Rating: \(restaurant.yelpRating)"
+        cell.foursquareRatingLabel.text = "Foursquare Rating: \(restaurant.foursquareRating)"
+        cell.googleMapsRatingLabel.text = "Google Maps Rating: \(restaurant.googleMapsRating)"
+
+        return cell
+    }
+
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        guard let searchText = searchBar.text else { return }
+
+        searchForRestaurants(searchText: searchText)
+    }
+
+    func searchForRestaurants(searchText: String) {
+        guard let cityState = searchBar.text else { return }
+
+        let yelpAPIURL = "https://api.yelp.com/v3/businesses/search?term=\(searchText)&location=\(cityState)"
+        let foursquareAPIURL = "https://api.foursquare.com/v2/venues/search?client_id=\(foursquareClientID)&client_secret=\(foursquareClientSecret)&v=20220501&near=\(cityState)&query=\(searchText)"
+        let googleMapsAPIURL = "https://maps.googleapis.com/maps/api/place/textsearch/json?query=\(searchText)+in+\(cityState)&key=\(googleMapsAPIKey)"
+
+        let group = DispatchGroup()
+
+        var yelpRating: Double = 0.0
+        var foursquareRating: Double = 0.0
+        var googleMapsRating: Double = 0.0
+
+        group.enter()
+        fetchRatingFromAPI(apiURL: yelpAPIURL) { (rating) in
+            yelpRating = rating
+            group.leave()
         }
-        
-        guard let location = locationTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines), !location.isEmpty else {
-            // Show an error message to the user
-            return
+
+        group.enter()
+        fetchRatingFromAPI(apiURL: foursquareAPIURL) { (rating) in
+            foursquareRating = rating
+            group.leave()
         }
-        
-        let yelpURL = URL(string: "https://api.yelp.com/v3/businesses/search")!
-        var yelpURLRequest = URLRequest(url: yelpURL)
-        yelpURLRequest.addValue("Bearer <your_yelp_api_key>", forHTTPHeaderField: "Authorization")
-        yelpURLRequest.httpMethod = "GET"
-        
-        let yelpParameters = ["term": searchTerm, "location": location]
-        let encodedYelpParams = yelpParameters.map { (key, value) in
-            return "\(key)=\(value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)"
-        }.joined(separator: "&")
-        yelpURLRequest.url = URL(string: "\(yelpURL.absoluteString)?\(encodedYelpParams)")
-        
-        let task = URLSession.shared.dataTask(with: yelpURLRequest) { (data, response, error) in
-            if let error = error {
-                print("Error: \(error.localizedDescription)")
-                return
-            }
-            
-            guard let data = data else {
-                print("No data received")
-                return
-            }
-            
+
+        group.enter()
+        fetchRatingFromAPI(apiURL: googleMapsAPIURL) { (rating) in
+            googleMapsRating = rating
+            group.leave()
+        }
+
+        group.notify(queue: .main) {
+            let restaurant = Restaurant(name: searchText, yelpRating: yelpRating, foursquareRating: foursquareRating, googleMapsRating: googleMapsRating)
+            self.restaurants.append(restaurant)
+            self.tableView.reloadData()
+        }
+    }
+
+    func fetchRatingFromAPI(apiURL: String, completion: @escaping (Double) -> Void) {
+        guard let url = URL(string: apiURL) else { return }
+
+        var request = URLRequest(url: url)
+        request.addValue("Bearer \(yelpAPIKey)", forHTTPHeaderField: "Authorization")
+
+        let task = URLSession.shared.dataTask(with: request) { (data, response, error) in
+            guard let data = data else { return }
+
             do {
-                let decoder = JSONDecoder()
-                decoder.keyDecodingStrategy = .convertFromSnakeCase
-                let yelpResponse = try decoder.decode(YelpResponse.self, from: data)
-                let searchResult = SearchResult(name: yelpResponse.businesses[0].name, yelpRating: yelpResponse.businesses[0].rating)
-                self.searchResults.append(searchResult)
-                self.tableView.reloadData()
-            } catch {
-                print("Error decoding response: \(error.localizedDescription)")
-            }
-        }
-        task.resume()
-    }
-    
-    func searchFoursquare() {
-        guard let searchTerm = searchBar.text?.trimmingCharacters(in: .whitespacesAndNewlines), !searchTerm.isEmpty else {
-            // Show an error message to the user
-            return
-        }
-        
-        guard let location = locationTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines), !location.isEmpty else {
-            // Show an error message to the user
-            return
-        }
-        
-        let foursquareURL = URL(string: "https://api.foursquare.com/v2/venues/search")!
-        var foursquareURLRequest = URLRequest(url: foursquareURL)
-        let foursquareParameters = ["query": searchTerm, "near": location, "client_id": "<your_foursquare_client_id>", "client_secret": "<your_foursquare_client_secret>", "v": "20230505"]
-        let encodedFoursquareParams = foursquareParameters.map { (key, value) in
-            return "\(key)=\(value.addingPercentEncoding(withAllowedCharacters:
+                let json = try JSONSerialization
