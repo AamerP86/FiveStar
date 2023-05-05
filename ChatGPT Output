@@ -132,3 +132,16 @@ func extractRatingFromAPIResponse(json: [String: Any]?) -> Double {
 
     return 0.0
 }
+class Restaurant {
+    let name: String
+    let yelpRating: Double
+    let foursquareRating: Double
+    let googleMapsRating: Double
+    
+    init(name: String, yelpRating: Double, foursquareRating: Double, googleMapsRating: Double) {
+        self.name = name
+        self.yelpRating = yelpRating
+        self.foursquareRating = foursquareRating
+        self.googleMapsRating = googleMapsRating
+    }
+}
