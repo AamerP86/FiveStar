@@ -79,7 +79,7 @@ class ViewController: UIViewController, UITableViewDataSource, UITableViewDelega
         guard let url = URL(string: apiURL) else { return }
 
         var request = URLRequest(url: url)
-        request.addValue("Bearer \(yelpAPIKey)", forHTTPHeaderField: "Authorization")
+        request.addValue("Bearer grFMRE44_IyYp3jwv7aygTrWYfMyb-iNVKCTS6GUkK23xiPT6WoVl1yoDZSFl4c7H_uQxuzPioQkG2PjrZ5cY2lp-m0Ne1zHOtPel3ZN3n3ONUjCcsV7QZdrUtFBZHYx", forHTTPHeaderField: "Authorization")
 
         let task = URLSession.shared.dataTask(with: request) { (data, response, error) in
             guard let data = data else { return }
@@ -90,7 +90,7 @@ func fetchRatingFromAPI(apiURL: String, completion: @escaping (Double) -> Void) 
     guard let url = URL(string: apiURL) else { return }
 
     var request = URLRequest(url: url)
-    request.addValue("Bearer \(yelpAPIKey)", forHTTPHeaderField: "Authorization")
+    request.addValue("Bearer grFMRE44_IyYp3jwv7aygTrWYfMyb-iNVKCTS6GUkK23xiPT6WoVl1yoDZSFl4c7H_uQxuzPioQkG2PjrZ5cY2lp-m0Ne1zHOtPel3ZN3n3ONUjCcsV7QZdrUtFBZHYx", forHTTPHeaderField: "Authorization")
 
     let task = URLSession.shared.dataTask(with: request) { (data, response, error) in
         guard let data = data else { return }
